@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Base styles */
+html,
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  @apply h-full antialiased;
+}
+
+/* Custom utilities */
+@layer utilities {
+  .bg-gradient-brand {
+    @apply bg-gradient-to-r from-blue-600 to-purple-600;
+  }
 }

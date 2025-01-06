@@ -3,36 +3,13 @@ import { SignIn } from "@clerk/nextjs"
 
 export default function SignInPage() {
     return (
-        <div style={{
-            minHeight: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            backgroundColor: '#1a1a1a'
-        }}>
-            <div style={{
-                width: '100%',
-                padding: '40px 0',
-                textAlign: 'center',
-                backgroundColor: '#3B82F6',
-                marginBottom: '40px'
-            }}>
-                <h1 style={{
-                    color: 'white',
-                    fontSize: '2rem',
-                    fontWeight: 'bold'
-                }}>ChatGenius</h1>
-                <p style={{
-                    color: 'rgba(255,255,255,0.9)',
-                    marginTop: '8px'
-                }}>Sign in to start chatting</p>
+        <div className="min-h-screen flex flex-col items-center bg-gray-900">
+            <div className="w-full py-10 text-center bg-gradient-brand shadow-lg mb-10">
+                <h1 className="text-2xl font-bold text-white">ChatGenius</h1>
+                <p className="text-white/90 mt-2">Sign in to start chatting</p>
             </div>
 
-            <div style={{
-                width: '100%',
-                maxWidth: '400px',
-                padding: '0 16px'
-            }}>
+            <div className="w-full max-w-[400px] px-4">
                 <SignIn
                     appearance={{
                         elements: {
