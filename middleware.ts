@@ -12,9 +12,18 @@ const isPublic = (path: string) => {
 };
 
 export default withClerkMiddleware((request: NextRequest) => {
+    // Add pathname to headers for layout detection
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('x-pathname', request.nextUrl.pathname)
+
     if (isPublic(request.nextUrl.pathname)) {
-        return NextResponse.next();
+        return NextResponse.next({
+            request: {
+                headers: requestHeaders,
+            },
+        });
     }
+
     // If the user is not signed in and the path is not public, redirect them to sign in
     const { userId } = getAuth(request);
     if (!userId) {
@@ -22,7 +31,12 @@ export default withClerkMiddleware((request: NextRequest) => {
         signInUrl.searchParams.set("redirect_url", request.url);
         return NextResponse.redirect(signInUrl);
     }
-    return NextResponse.next();
+
+    return NextResponse.next({
+        request: {
+            headers: requestHeaders,
+        },
+    });
 });
 
 // Stop Middleware running on static files
