@@ -2,6 +2,8 @@
 
 A real-time communication platform built with Next.js, Supabase, and Clerk.
 
+> **Important Note**: This project follows a specific, fixed scope as outlined in this document. The features and implementation details listed here are final and will not be expanded beyond what is documented. I have minimal prior knowledge of the technologies used.
+
 ## Project Overview
 
 ChatGenius is a modern chat application (Slack clone) that enables real-time communication through channels and direct messages. It's designed to provide a seamless, Slack-like experience with a focus on performance and user experience.

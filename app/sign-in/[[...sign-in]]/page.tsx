@@ -11,6 +11,9 @@ export default function SignInPage() {
 
             <div className="w-full max-w-[400px] px-4">
                 <SignIn
+                    routing="path"
+                    path="/sign-in"
+                    signUpUrl="/sign-up"
                     appearance={{
                         elements: {
                             card: {
@@ -40,12 +43,65 @@ export default function SignInPage() {
                                 color: 'white'
                             },
                             footerActionLink: {
-                                color: '#60a5fa'
+                                color: '#9ca3af',
+                                '&:hover': {
+                                    color: '#93c5fd'
+                                }
                             },
                             dividerText: {
                                 color: '#9ca3af'
+                            },
+                            socialButtonsBlockButton: {
+                                backgroundColor: '#374151',
+                                color: 'white',
+                                border: '1px solid #4b5563',
+                                '&:hover': {
+                                    backgroundColor: '#4b5563'
+                                }
+                            },
+                            socialButtonsBlockButtonText: {
+                                color: 'white'
+                            },
+                            footerText: {
+                                color: 'white'
+                            },
+                            formFieldAction: {
+                                color: 'white',
+                                '&:hover': {
+                                    color: '#93c5fd'
+                                }
+                            },
+                            footerAction: {
+                                color: '#60a5fa',
+                                '&:hover': {
+                                    color: '#93c5fd'
+                                }
+                            },
+                            // Style all footer elements
+                            rootBox: {
+                                '& .cl-footer button, & .cl-footer a, & .cl-footer span': {
+                                    color: 'white !important',
+                                    '&:hover': {
+                                        color: '#93c5fd !important'
+                                    }
+                                },
+                                '& .cl-footerActionLink': {
+                                    color: '#60a5fa !important',
+                                    '&:hover': {
+                                        color: '#93c5fd !important'
+                                    }
+                                },
+                                '& .cl-powered': {
+                                    display: 'none !important'
+                                }
                             }
-                        }
+                        },
+                        layout: {
+                            socialButtonsPlacement: "bottom",
+                            showOptionalFields: true,
+                            privacyPageUrl: "https://clerk.dev/privacy",
+                            termsPageUrl: "https://clerk.dev/terms"
+                        },
                     }}
                 />
             </div>

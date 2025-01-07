@@ -2,15 +2,26 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/supabase'
 import { useAuth, useUser } from '@clerk/nextjs'
+import { supabaseClient } from '@/lib/supabase-client'
 
 type Props = {
     isOpen: boolean
     onClose: () => void
+    onChannelCreated: (channel: Channel) => void
 }
 
-export default function CreateChannelModal({ isOpen, onClose }: Props) {
+type Channel = {
+    id: string
+    name: string
+    description?: string
+    type: 'public' | 'private'
+    created_by: string
+    created_at: string
+    updated_at: string
+}
+
+export default function CreateChannelModal({ isOpen, onClose, onChannelCreated }: Props) {
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
     const [isLoading, setIsLoading] = useState(false)
@@ -26,90 +37,47 @@ export default function CreateChannelModal({ isOpen, onClose }: Props) {
         setIsLoading(true)
         setError(null)
 
+        // Client-side validation
+        const trimmedName = name.trim()
+        if (!trimmedName) {
+            setError('Channel name is required')
+            setIsLoading(false)
+            return
+        }
+
+        if (!/^[a-z0-9-_]+$/.test(trimmedName)) {
+            setError('Channel name can only contain lowercase letters, numbers, hyphens, and underscores')
+            setIsLoading(false)
+            return
+        }
+
         try {
             if (!userId || !user) {
                 throw new Error('You must be logged in to create a channel')
             }
 
-            // Validate channel name
-            if (!name.trim()) {
-                throw new Error('Channel name is required')
-            }
-
-            if (!/^[a-z0-9-_]+$/.test(name)) {
-                throw new Error('Channel name can only contain lowercase letters, numbers, hyphens, and underscores')
-            }
-
-            // Check for duplicate channel name
-            const { data: existingChannel, error: checkError } = await supabase
+            // Create the channel in the database
+            const { data: newChannel, error: insertError } = await supabaseClient
                 .from('channels')
-                .select('id')
-                .eq('name', name.trim())
-                .single()
-
-            if (checkError && checkError.code !== 'PGRST116') {
-                console.error('Error checking for existing channel:', checkError)
-                throw new Error('Failed to check for existing channel')
-            }
-
-            if (existingChannel) {
-                throw new Error('A channel with this name already exists')
-            }
-
-            const channelData = {
-                name: name.trim(),
-                description: description.trim() || null,
-                created_by: userId,
-                type: 'public',
-                is_direct: false
-            }
-
-            console.log('Creating channel with data:', channelData)
-
-            // Create the channel
-            const { data: channel, error: channelError } = await supabase
-                .from('channels')
-                .insert([channelData])
+                .insert([
+                    {
+                        name: trimmedName,
+                        description: description.trim(),
+                        type: 'public',
+                        created_by: userId
+                    }
+                ])
                 .select()
                 .single()
 
-            if (channelError) {
-                console.error('Error creating channel:', channelError)
-                throw new Error(`Failed to create channel: ${channelError.message}`)
-            }
+            if (insertError) throw insertError
+            if (!newChannel) throw new Error('Failed to create channel')
 
-            if (!channel) {
-                throw new Error('Channel was not created')
-            }
-
-            console.log('Channel created:', channel)
-
-            // Add creator as channel member
-            const memberData = {
-                channel_id: channel.id,
-                user_id: userId
-            }
-
-            console.log('Adding member with data:', memberData)
-
-            const { error: memberError } = await supabase
-                .from('channel_members')
-                .insert([memberData])
-
-            if (memberError) {
-                console.error('Error adding member:', memberError)
-                // Rollback channel creation if member addition fails
-                await supabase
-                    .from('channels')
-                    .delete()
-                    .eq('id', channel.id)
-                throw new Error(`Failed to add member to channel: ${memberError.message}`)
-            }
-
-            console.log('Channel member added successfully')
-            router.refresh()
+            onChannelCreated(newChannel)
             onClose()
-            router.push(`/channels/${channel.id}`)
+
+            // Update the URL with the new channel ID
+            router.push(`/?channel=${newChannel.id}`)
         } catch (err) {
             console.error('Channel creation error:', err)
             setError(err instanceof Error ? err.message : 'Failed to create channel')
@@ -163,25 +131,19 @@ export default function CreateChannelModal({ isOpen, onClose }: Props) {
                         />
                     </div>
 
-                    <div className="flex justify-end space-x-3 mt-6">
+                    <div className="flex justify-end space-x-3">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 text-sm text-gray-300 hover:text-white"
+                            className="px-4 py-2 text-gray-300 hover:text-white"
                             disabled={isLoading}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
+                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50"
                             disabled={isLoading}
-                            className={`
-                                px-4 py-2 text-sm text-white rounded
-                                ${isLoading
-                                    ? 'bg-blue-500 opacity-50 cursor-not-allowed'
-                                    : 'bg-blue-500 hover:bg-blue-600'
-                                }
-                            `}
                         >
                             {isLoading ? 'Creating...' : 'Create Channel'}
                         </button>

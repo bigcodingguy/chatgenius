@@ -1,24 +1,7 @@
+import { auth } from '@clerk/nextjs'
 import { NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
-import { supabase } from '../../../lib/supabase'
-import { Channel } from '../../../types/database'
-
-// Validation helpers
-const CHANNEL_NAME_REGEX = /^[a-z0-9-_]+$/
-const validateChannelName = (name: string) => {
-    if (!name?.trim()) {
-        return 'Channel name is required'
-    }
-    if (!CHANNEL_NAME_REGEX.test(name)) {
-        return 'Channel name can only contain lowercase letters, numbers, hyphens, and underscores'
-    }
-    return null
-}
-
-type CreateChannelRequest = {
-    name: string
-    description?: string
-}
+import { getServiceSupabase } from '../../../lib/supabase-client'
+import { Database } from '../../../types/database'
 
 // GET /api/channels - List all channels
 export async function GET() {
@@ -28,6 +11,7 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        const supabase = getServiceSupabase()
         const { data: channels, error } = await supabase
             .from('channels')
             .select('*')
@@ -36,7 +20,7 @@ export async function GET() {
 
         if (error) throw error
 
-        return NextResponse.json(channels as Channel[])
+        return NextResponse.json(channels)
     } catch (error) {
         console.error('Error:', error)
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
@@ -47,25 +31,49 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const { userId } = await auth()
+        console.log('Creating channel for user:', userId)
+
         if (!userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const json = await request.json() as CreateChannelRequest
-        const { name, description } = json
+        const body = await request.json()
+        console.log('Request body:', body)
+        const { name, description } = body
 
         // Validate channel name
-        const nameError = validateChannelName(name)
-        if (nameError) {
-            return NextResponse.json({ error: nameError }, { status: 400 })
+        if (!name?.trim()) {
+            return NextResponse.json({ error: 'Channel name is required' }, { status: 400 })
         }
 
+        if (!/^[a-z0-9-_]+$/.test(name)) {
+            return NextResponse.json(
+                { error: 'Channel name can only contain lowercase letters, numbers, hyphens, and underscores' },
+                { status: 400 }
+            )
+        }
+
+        const supabase = getServiceSupabase()
+
         // Check for duplicate channel name
-        const { data: existingChannel } = await supabase
+        console.log('Checking for existing channel:', name.trim())
+        const { data: existingChannel, error: checkError } = await supabase
             .from('channels')
             .select('id')
             .eq('name', name.trim())
             .single()
+
+        console.log('Existing channel check result:', { existingChannel, error: checkError })
+
+        if (checkError && checkError.code !== 'PGRST116') {
+            console.error('Error checking for existing channel:', {
+                error: checkError,
+                code: checkError.code,
+                message: checkError.message,
+                details: checkError.details
+            })
+            throw new Error('Failed to check for existing channel')
+        }
 
         if (existingChannel) {
             return NextResponse.json(
@@ -75,46 +83,87 @@ export async function POST(request: Request) {
         }
 
         // Create the channel
+        const channelData = {
+            name: name.trim(),
+            description: description?.trim() || null,
+            created_by: userId,
+            type: 'public',
+            is_direct: false
+        }
+        console.log('Creating channel with data:', channelData)
+
         const { data: channel, error: channelError } = await supabase
             .from('channels')
-            .insert([
-                {
-                    name: name.trim(),
-                    description: description?.trim(),
-                    created_by: userId,
-                    type: 'public',
-                    is_direct: false
-                }
-            ])
+            .insert(channelData)
             .select()
             .single()
 
-        if (channelError) throw channelError
+        if (channelError) {
+            console.error('Error creating channel:', {
+                error: channelError,
+                code: channelError.code,
+                message: channelError.message,
+                details: channelError.details,
+                hint: channelError.hint
+            })
+            return NextResponse.json(
+                { error: `Failed to create channel: ${channelError.message}` },
+                { status: 500 }
+            )
+        }
 
-        // Add the creator as a channel member
+        if (!channel) {
+            console.error('No channel returned after creation')
+            return NextResponse.json(
+                { error: 'Channel creation failed: no channel returned' },
+                { status: 500 }
+            )
+        }
+
+        console.log('Channel created:', channel)
+
+        // Add creator as channel member
+        const memberData = {
+            channel_id: channel.id,
+            user_id: userId,
+            role: 'admin' as const
+        }
+        console.log('Adding member with data:', memberData)
+
         const { error: memberError } = await supabase
             .from('channel_members')
-            .insert([
-                {
-                    channel_id: channel.id,
-                    user_id: userId
-                }
-            ])
+            .insert(memberData)
 
         if (memberError) {
-            // If member creation fails, delete the channel and throw error
+            console.error('Error adding member:', {
+                error: memberError,
+                code: memberError.code,
+                message: memberError.message,
+                details: memberError.details,
+                hint: memberError.hint
+            })
+            // Rollback channel creation if member addition fails
+            console.log('Rolling back channel creation...')
             await supabase
                 .from('channels')
                 .delete()
                 .eq('id', channel.id)
-            throw memberError
+            return NextResponse.json(
+                { error: `Failed to add member to channel: ${memberError.message}` },
+                { status: 500 }
+            )
         }
 
-        return NextResponse.json(channel as Channel)
+        console.log('Channel member added successfully')
+        return NextResponse.json(channel)
     } catch (error) {
-        console.error('Error:', error)
+        console.error('Channel creation error:', {
+            error,
+            message: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined
+        })
         return NextResponse.json(
-            { error: 'Failed to create channel' },
+            { error: error instanceof Error ? error.message : 'Failed to create channel' },
             { status: 500 }
         )
     }

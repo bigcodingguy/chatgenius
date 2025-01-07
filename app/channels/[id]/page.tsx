@@ -4,19 +4,19 @@ import React, { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import MessageList from '../../components/MessageList'
 import MessageInput from '../../components/MessageInput'
-import { supabase } from '../../../lib/supabase'
+import { supabaseClient } from '../../../lib/supabase-client'
 import { Channel } from '../../../types/database'
 
 export default function ChannelPage() {
     const params = useParams()
-    const channelId = parseInt(params.id as string)
+    const channelId = params.id as string  // No need to parse as integer for UUID
     const [channel, setChannel] = useState<Channel | null>(null)
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
         async function fetchChannel() {
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('channels')
                     .select('*')
                     .eq('id', channelId)
@@ -32,6 +32,28 @@ export default function ChannelPage() {
 
         if (channelId) {
             fetchChannel()
+
+            // Subscribe to channel updates
+            const subscription = supabaseClient
+                .channel(`channel-${channelId}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'channels',
+                    filter: `id=eq.${channelId}`
+                }, (payload) => {
+                    if (payload.eventType === 'DELETE') {
+                        setError('Channel has been deleted')
+                        setChannel(null)
+                    } else {
+                        setChannel(payload.new as Channel)
+                    }
+                })
+                .subscribe()
+
+            return () => {
+                subscription.unsubscribe()
+            }
         }
     }, [channelId])
 

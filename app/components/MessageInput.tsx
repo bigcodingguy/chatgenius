@@ -1,11 +1,11 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabaseClient } from '../../lib/supabase-client'
 import { useAuth } from '@clerk/nextjs'
 
 type Props = {
-    channelId: number
+    channelId: string
 }
 
 export default function MessageInput({ channelId }: Props) {
@@ -18,7 +18,7 @@ export default function MessageInput({ channelId }: Props) {
     const broadcastTyping = () => {
         if (!userId) return
 
-        supabase.channel(`channel-${channelId}`).send({
+        supabaseClient.channel(`channel-${channelId}`).send({
             type: 'broadcast',
             event: 'typing',
             payload: { userId }
@@ -59,7 +59,7 @@ export default function MessageInput({ channelId }: Props) {
 
         setIsLoading(true)
         try {
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('messages')
                 .insert([
                     {

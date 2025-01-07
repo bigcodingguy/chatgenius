@@ -1,13 +1,13 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabaseClient } from '../../lib/supabase-client'
 import { Message } from '../../types/database'
 import { useUser } from '@clerk/nextjs'
 import { formatDistanceToNow } from 'date-fns'
 
 type Props = {
-    channelId: number
+    channelId: string
 }
 
 type MessageWithUser = Message & {
@@ -27,7 +27,7 @@ export default function MessageList({ channelId }: Props) {
         // Initial fetch of messages
         async function fetchMessages() {
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('messages')
                     .select(`
                         *,
@@ -51,7 +51,7 @@ export default function MessageList({ channelId }: Props) {
         fetchMessages()
 
         // Subscribe to new messages and typing indicators
-        const channel = supabase.channel(`channel-${channelId}`)
+        const channel = supabaseClient.channel(`channel-${channelId}`)
 
         // Handle new messages
         channel.on('postgres_changes', {
@@ -61,7 +61,7 @@ export default function MessageList({ channelId }: Props) {
             filter: `channel_id=eq.${channelId}`
         }, async (payload) => {
             // Fetch user data for the new message
-            const { data: userData } = await supabase
+            const { data: userData } = await supabaseClient
                 .from('users')
                 .select('username:raw_user_meta_data->username, imageUrl:raw_user_meta_data->imageUrl')
                 .eq('id', payload.new.user_id)
